@@ -43,8 +43,12 @@ body.focus-mode{padding:0;gap:0;background:#000}body.focus-mode header,body.focu
 <div id="game"><div style="height:100%;display:grid;place-items:center;color:#9b91aa;font-size:11px;text-align:center;padding:10px">Escolhe o console e uma ROM ou ZIP<br>para iniciar neste lado.</div></div>
 <div id="hint">Dois consoles lado a lado • visual CRT • controles virtuais ocultos</div>
 <div id="mappingPanel" hidden style="position:fixed;z-index:20000;inset:5%;overflow:auto;background:#17131e;border:2px solid #9b5cff;border-radius:12px;padding:14px;box-shadow:0 0 0 9999px #000b;color:#fff">
-<h3 style="margin:0 0 8px">Mapeamento do controle</h3><p style="font-size:12px;color:#c9bfd7">Escolhe qual botão físico corresponde a cada ação.</p>
-<button id="autoMap" class="primary" style="width:100%;margin-bottom:10px">Mapear automaticamente (padrão)</button><div id="mapRows"></div>
+<h3 style="margin:0 0 8px">Controles físicos</h3><p style="font-size:12px;color:#c9bfd7">Escolhe um controle já conectado ao celular, vincula ao jogador e configura os botões.</p>
+<div style="display:flex;gap:7px;margin-bottom:8px"><button id="refreshPads" style="flex:1">Atualizar lista</button><button id="disconnectPad" style="flex:1">Desvincular</button></div>
+<div id="padList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
+<button id="pairPad" class="primary" style="width:100%;margin-bottom:12px">Vincular ao jogador deste lado</button>
+<div style="border-top:1px solid #4a4055;padding-top:10px"><h4 style="margin:0 0 6px">Mapeamento dos botões</h4>
+<button id="autoMap" class="primary" style="width:100%;margin-bottom:10px">Mapear automaticamente (padrão)</button><div id="mapRows"></div></div>
 <div style="display:flex;gap:8px;margin-top:12px"><button id="saveMap" class="primary" style="flex:1">Salvar</button><button id="closeMap" style="flex:1">Fechar</button></div></div>
 <script>
 (function(){
@@ -59,6 +63,8 @@ body.focus-mode{padding:0;gap:0;background:#000}body.focus-mode header,body.focu
   const actionNames=[['UP','Cima'],['DOWN','Baixo'],['LEFT','Esquerda'],['RIGHT','Direita'],['A','A'],['B','B'],['X','X'],['Y','Y'],['START','Start'],['SELECT','Select'],['L1','L1'],['R1','R1'],['L2','L2'],['R2','R2']];
   const physicalButtons=[['96','A / Cruz'],['97','B / Círculo'],['99','X / Quadrado'],['100','Y / Triângulo'],['108','Start'],['109','Select'],['102','L1'],['103','R1'],['104','L2'],['105','R2'],['19','D-pad cima'],['20','D-pad baixo'],['21','D-pad esquerda'],['22','D-pad direita'],['0','Desativado']];
   const mapValues={};
+  let selectedDescriptor='';
+  let availablePads=[];
   let chosenFile=null, loading=false, activeGameUrl=null, loaderScript=null;
   document.getElementById('slotLabel').textContent='DUAL '+slot;
   window.setControllerStatus=function(name){document.getElementById('controllerStatus').textContent='Controle físico: '+name;};
@@ -78,7 +84,11 @@ body.focus-mode{padding:0;gap:0;background:#000}body.focus-mode header,body.focu
   });
   function defaultPhysical(id){return ({UP:'19',DOWN:'20',LEFT:'21',RIGHT:'22',A:'96',B:'97',X:'99',Y:'100',START:'108',SELECT:'109',L1:'102',R1:'103',L2:'104',R2:'105'})[id]||'0';}
   function renderMap(){const rows=document.getElementById('mapRows');rows.innerHTML='';actionNames.forEach(([id,label])=>{const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #38303f;font-size:13px';const title=document.createElement('span');title.textContent=label;const sel=document.createElement('select');sel.dataset.action=id;sel.style.cssText='width:58%;font-size:12px';physicalButtons.forEach(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;sel.appendChild(o)});sel.value=mapValues[id]||defaultPhysical(id);row.append(title,sel);rows.appendChild(row);});}
-  document.getElementById('bindController').addEventListener('click',()=>{mappingPanel.hidden=false;if(window.CyberBridge&&window.CyberBridge.getPhysicalMapping)window.loadPhysicalMapping(window.CyberBridge.getPhysicalMapping());renderMap();if(window.CyberBridge)window.CyberBridge.bindController();});
+  function refreshPads(){const list=document.getElementById('padList');list.innerHTML='';try{availablePads=JSON.parse(window.CyberBridge.getControllers()||'[]')}catch(e){availablePads=[]}if(!availablePads.length){const p=document.createElement('div');p.textContent='Nenhum controle detectado. Primeiro conecta o controle nas configurações Bluetooth/USB do Android e toca em Atualizar lista.';p.style.cssText='font-size:12px;color:#c9bfd7;padding:10px;border:1px dashed #62556e;border-radius:8px';list.appendChild(p);selectedDescriptor='';return;}availablePads.forEach(pad=>{const b=document.createElement('button');b.style.cssText='text-align:left;padding:10px;border-radius:8px;background:'+(selectedDescriptor===pad.descriptor?'#3b2855':'#211c29')+';border:1px solid '+(selectedDescriptor===pad.descriptor?'#b78aff':'#494052');b.innerHTML='';const title=document.createElement('div');title.style.fontWeight='bold';title.textContent=pad.name||'Controle';const sub=document.createElement('div');sub.style.cssText='font-size:11px;color:#c9bfd7;margin-top:3px';sub.textContent=pad.assigned?'Vinculado ao jogador '+pad.assigned:'Conectado • disponível';b.append(title,sub);b.addEventListener('click',()=>{selectedDescriptor=pad.descriptor;refreshPads()});list.appendChild(b);});}
+  document.getElementById('bindController').addEventListener('click',()=>{mappingPanel.hidden=false;if(window.CyberBridge&&window.CyberBridge.getPhysicalMapping)window.loadPhysicalMapping(window.CyberBridge.getPhysicalMapping());renderMap();refreshPads();});
+  document.getElementById('refreshPads').addEventListener('click',refreshPads);
+  document.getElementById('pairPad').addEventListener('click',()=>{if(!selectedDescriptor){hint.textContent='Seleciona um controle conectado na lista primeiro.';return;}if(window.CyberBridge&&window.CyberBridge.assignController)window.CyberBridge.assignController(selectedDescriptor);refreshPads();});
+  document.getElementById('disconnectPad').addEventListener('click',()=>{if(window.CyberBridge)window.CyberBridge.disconnectController();selectedDescriptor='';refreshPads();});
   document.getElementById('closeMap').addEventListener('click',()=>mappingPanel.hidden=true);
   document.getElementById('autoMap').addEventListener('click',()=>{actionNames.forEach(([id])=>mapValues[id]=defaultPhysical(id));renderMap();hint.textContent='Mapeamento padrão aplicado. Clica em Salvar.';});
   document.getElementById('saveMap').addEventListener('click',()=>{document.querySelectorAll('#mapRows select').forEach(s=>mapValues[s.dataset.action]=s.value);if(window.CyberBridge)window.CyberBridge.savePhysicalMapping(JSON.stringify(mapValues));mappingPanel.hidden=true;hint.textContent='Mapeamento físico salvo para este lado.';});
