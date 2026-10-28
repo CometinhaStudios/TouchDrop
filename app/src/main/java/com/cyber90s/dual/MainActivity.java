@@ -343,7 +343,7 @@ public class MainActivity extends Activity {
                 for (int id : InputDevice.getDeviceIds()) {
                     InputDevice device = InputDevice.getDevice(id);
                     if (device != null && descriptor != null && descriptor.equals(device.getDescriptor())) {
-                        assignController(slot, device);
+                        MainActivity.this.assignController(slot, device);
                         return;
                     }
                 }
@@ -353,7 +353,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void disconnectController() {
-            runOnUiThread(() -> disconnectController(slot));
+            runOnUiThread(() -> MainActivity.this.disconnectController(slot));
         }
 
         @JavascriptInterface
