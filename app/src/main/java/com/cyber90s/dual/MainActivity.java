@@ -291,6 +291,21 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getPhysicalMapping() {
+            try {
+                String[] actions = {"UP","DOWN","LEFT","RIGHT","A","B","X","Y","START","SELECT","L1","R1","L2","R2"};
+                int[] defaults = {KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_RIGHT,
+                        KeyEvent.KEYCODE_BUTTON_A,KeyEvent.KEYCODE_BUTTON_B,KeyEvent.KEYCODE_BUTTON_X,KeyEvent.KEYCODE_BUTTON_Y,
+                        KeyEvent.KEYCODE_BUTTON_START,KeyEvent.KEYCODE_BUTTON_SELECT,KeyEvent.KEYCODE_BUTTON_L1,KeyEvent.KEYCODE_BUTTON_R1,
+                        KeyEvent.KEYCODE_BUTTON_L2,KeyEvent.KEYCODE_BUTTON_R2};
+                android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+                JSONObject result = new JSONObject();
+                for (int i=0;i<actions.length;i++) result.put(actions[i], String.valueOf(prefs.getInt("map_slot_" + (slot+1) + "_" + actions[i], defaults[i])));
+                return result.toString();
+            } catch (Exception e) { return "{}"; }
+        }
+
+        @JavascriptInterface
         public void savePhysicalMapping(String json) {
             runOnUiThread(() -> {
                 try {
