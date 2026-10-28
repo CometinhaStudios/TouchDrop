@@ -198,11 +198,42 @@ public class MainActivity extends Activity {
         players[slot].post(() -> players[slot].evaluateJavascript(js, null));
     }
 
+    private int androidKeyCode(String key) {
+        if (key == null) return KeyEvent.KEYCODE_UNKNOWN;
+        switch (key) {
+            case "ArrowUp": return KeyEvent.KEYCODE_DPAD_UP;
+            case "ArrowDown": return KeyEvent.KEYCODE_DPAD_DOWN;
+            case "ArrowLeft": return KeyEvent.KEYCODE_DPAD_LEFT;
+            case "ArrowRight": return KeyEvent.KEYCODE_DPAD_RIGHT;
+            case "enter": return KeyEvent.KEYCODE_ENTER;
+            case "tab": return KeyEvent.KEYCODE_TAB;
+            default:
+                if (key.length() == 1) {
+                    char c = Character.toUpperCase(key.charAt(0));
+                    if (c >= 'A' && c <= 'Z') return KeyEvent.KEYCODE_A + (c - 'A');
+                    if (c >= '0' && c <= '9') return KeyEvent.KEYCODE_0 + (c - '0');
+                }
+                return KeyEvent.KEYCODE_UNKNOWN;
+        }
+    }
+
     private void sendKeyToSlot(int slot, String key, boolean down) {
         if (slot < 0 || slot > 1 || players[slot] == null || key == null) return;
-        String js = "if(window.cyberInput)window.cyberInput(" + JSONObject.quote(key) + "," + down + ");"
-                + (down ? "if(window.setControllerStatus)window.setControllerStatus('Sinal recebido • " + (slot + 1) + "');" : "");
-        players[slot].post(() -> players[slot].evaluateJavascript(js, null));
+        WebView web = players[slot];
+        int keyCode = androidKeyCode(key);
+        if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
+            // Send a real Android KeyEvent directly to the WebView. Synthetic
+            // JavaScript KeyboardEvents are ignored by some EmulatorJS builds.
+            web.post(() -> {
+                long now = android.os.SystemClock.uptimeMillis();
+                int action = down ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
+                KeyEvent nativeEvent = new KeyEvent(now, now, action, keyCode, 0);
+                web.dispatchKeyEvent(nativeEvent);
+                if (down) {
+                    web.evaluateJavascript("if(window.setControllerStatus)window.setControllerStatus('Comando enviado • " + (slot + 1) + "');", null);
+                }
+            });
+        }
     }
 
     private String actionForKeyCode(int keyCode, int slot) {
