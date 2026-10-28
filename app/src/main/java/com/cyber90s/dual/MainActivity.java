@@ -245,35 +245,53 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         InputDevice device = event.getDevice();
-        if (capturingAction != null && event.getAction() == KeyEvent.ACTION_DOWN && device != null && isGamepad(device)) {
+        if (device == null) return super.dispatchKeyEvent(event);
+
+        int assignedSlot = slotForDescriptor(device.getDescriptor());
+        boolean controllerEvent = isGamepad(device) || assignedSlot >= 0;
+
+        // Ao mapear, aceite o botão do controle selecionado mesmo que o Android
+        // classifique esse evento como teclado/D-pad em vez de SOURCE_GAMEPAD.
+        if (capturingAction != null && event.getAction() == KeyEvent.ACTION_DOWN
+                && controllerEvent && (assignedSlot < 0 || assignedSlot == capturingSlot)) {
             int targetSlot = capturingSlot;
             String action = capturingAction;
-            getPreferences(MODE_PRIVATE).edit().putInt("map_slot_" + (targetSlot+1) + "_" + action, event.getKeyCode()).apply();
+            getPreferences(MODE_PRIVATE).edit()
+                    .putInt("map_slot_" + (targetSlot + 1) + "_" + action, event.getKeyCode())
+                    .apply();
             capturingAction = null;
             capturingSlot = -1;
             if (targetSlot >= 0 && targetSlot < 2 && players[targetSlot] != null) {
-                String js = "if(window.onPhysicalButtonCaptured)window.onPhysicalButtonCaptured(" + JSONObject.quote(action) + "," + event.getKeyCode() + ");";
+                String js = "if(window.onPhysicalButtonCaptured)window.onPhysicalButtonCaptured("
+                        + JSONObject.quote(action) + "," + event.getKeyCode() + ");";
                 players[targetSlot].post(() -> players[targetSlot].evaluateJavascript(js, null));
             }
             Toast.makeText(this, action + " mapeado para o botão " + event.getKeyCode(), Toast.LENGTH_SHORT).show();
             return true;
         }
-        if (!isGamepad(device)) return super.dispatchKeyEvent(event);
+
+        // Depois de vinculado, confie no descriptor salvo. Alguns controles
+        // enviam os botões como SOURCE_KEYBOARD ou SOURCE_DPAD.
+        if (assignedSlot < 0) {
+            if (!controllerEvent) return super.dispatchKeyEvent(event);
+            return true;
+        }
         if (event.getAction() != KeyEvent.ACTION_DOWN && event.getAction() != KeyEvent.ACTION_UP) return true;
-        int slot = slotForDescriptor(device.getDescriptor());
-        if (slot < 0) return true;
-        String key = mappedKey(event.getKeyCode(), slot);
-        if (key != null) sendKeyToSlot(slot, key, event.getAction() == KeyEvent.ACTION_DOWN);
+        String key = mappedKey(event.getKeyCode(), assignedSlot);
+        if (key != null) {
+            sendKeyToSlot(assignedSlot, key, event.getAction() == KeyEvent.ACTION_DOWN);
+            players[assignedSlot].post(() -> players[assignedSlot].requestFocus());
+        }
         return true;
     }
 
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent event) {
         InputDevice device = event.getDevice();
-        if (!isGamepad(device) || (event.getSource() & InputDevice.SOURCE_JOYSTICK) != InputDevice.SOURCE_JOYSTICK) {
-            return super.dispatchGenericMotionEvent(event);
-        }
+        if (device == null) return super.dispatchGenericMotionEvent(event);
         int slot = slotForDescriptor(device.getDescriptor());
+        boolean joystickEvent = (event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
+        if (slot < 0 && (!isGamepad(device) || !joystickEvent)) return super.dispatchGenericMotionEvent(event);
         if (slot < 0) return true;
 
         float x = Math.abs(event.getAxisValue(MotionEvent.AXIS_HAT_X)) > 0.1f
