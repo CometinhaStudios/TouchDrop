@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Cyber90s Dual</title>
 <style>
-:root{color-scheme:dark;--bg:#101014;--panel:#1b1b23;--accent:#9b5cff;--text:#f6f3ff;--muted:#b9b3c8}
+:root{color-scheme:dark;--bg:#08080b;--panel:#19151f;--accent:#9b5cff;--text:#f6f3ff;--muted:#b9b3c8}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:Arial,sans-serif;overflow:hidden}
-body{display:flex;flex-direction:column;padding:6px;gap:5px}
+body{display:flex;flex-direction:column;padding:5px;gap:4px;background:radial-gradient(ellipse at center,#201c25 0%,#070709 100%)}
 header{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:18px}
 .brand{font-size:12px;font-weight:800;letter-spacing:.5px}.slot{color:#c7a6ff}
 .status{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%}
@@ -16,7 +16,10 @@ header{display:flex;align-items:center;justify-content:space-between;gap:5px;min
 select,button{min-width:0;border:1px solid #494052;border-radius:6px;background:var(--panel);color:var(--text);font-size:10px;padding:6px 4px}
 button.primary{background:var(--accent);border-color:var(--accent);font-weight:bold}
 button:active{filter:brightness(1.25)}
-#game{flex:1;min-height:0;background:#000;border:1px solid #37313f;border-radius:6px;overflow:hidden;position:relative}
+#game{flex:1;min-height:0;background:#000;border:3px solid #28242e;border-radius:13px;overflow:hidden;position:relative;box-shadow:inset 0 0 18px #000,0 0 8px #000}
+#game:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0px,rgba(0,0,0,0) 2px,rgba(0,0,0,.25) 3px),linear-gradient(90deg,rgba(80,120,255,.035),rgba(255,60,60,.035));box-shadow:inset 0 0 25px rgba(0,0,0,.65)}
+.ejs_virtualGamepad,.ejs_gamepad,.gamepad,.gamepad-container,[class*=virtualGamepad],[id*=virtualGamepad],[class*=gamepad-overlay]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+body.focus-mode{padding:0;gap:0;background:#000}body.focus-mode header,body.focus-mode .controls,body.focus-mode #hint{display:none!important}body.focus-mode #game{border:0;border-radius:0;box-shadow:none}
 #game canvas{max-width:100%!important;max-height:100%!important;object-fit:contain}
 #hint{font-size:9px;color:var(--muted);line-height:1.25;min-height:12px;max-height:28px;overflow:hidden}
 #game .emulatorjs{max-width:100%;max-height:100%}
@@ -33,11 +36,16 @@ button:active{filter:brightness(1.25)}
   </select>
   <button id="chooseRom">Escolher ROM / ZIP</button>
   <button class="primary" id="loadGame">Carregar jogo</button>
-  <button id="bindController">Mapear controle físico</button>
+  <button id="bindController">Controles físicos ⚙</button>
+  <button id="fullscreen" class="primary">Tela cheia ⛶</button>
 </div>
 <input id="rom" type="file" accept=".sfc,.smc,.fig,.swc,.md,.gen,.bin,.smd,.nes,.gba,.zip" hidden>
 <div id="game"><div style="height:100%;display:grid;place-items:center;color:#9b91aa;font-size:11px;text-align:center;padding:10px">Escolhe o console e uma ROM ou ZIP<br>para iniciar neste lado.</div></div>
-<div id="hint">Sem controles virtuais. Usa “Mapear controle físico” para vincular um controle a este lado.</div>
+<div id="hint">Dois consoles lado a lado • visual CRT • controles virtuais ocultos</div>
+<div id="mappingPanel" hidden style="position:fixed;z-index:20000;inset:5%;overflow:auto;background:#17131e;border:2px solid #9b5cff;border-radius:12px;padding:14px;box-shadow:0 0 0 9999px #000b;color:#fff">
+<h3 style="margin:0 0 8px">Mapeamento do controle</h3><p style="font-size:12px;color:#c9bfd7">Escolhe qual botão físico corresponde a cada ação.</p>
+<button id="autoMap" class="primary" style="width:100%;margin-bottom:10px">Mapear automaticamente (padrão)</button><div id="mapRows"></div>
+<div style="display:flex;gap:8px;margin-top:12px"><button id="saveMap" class="primary" style="flex:1">Salvar</button><button id="closeMap" style="flex:1">Fechar</button></div></div>
 <script>
 (function(){
   const slot=Number(new URLSearchParams(location.search).get('slot')||1);
@@ -47,6 +55,10 @@ button:active{filter:brightness(1.25)}
   const hint=document.getElementById('hint');
   const chooseButton=document.getElementById('chooseRom');
   const loadButton=document.getElementById('loadGame');
+  const mappingPanel=document.getElementById('mappingPanel');
+  const actionNames=[['UP','Cima'],['DOWN','Baixo'],['LEFT','Esquerda'],['RIGHT','Direita'],['A','A'],['B','B'],['X','X'],['Y','Y'],['START','Start'],['SELECT','Select'],['L1','L1'],['R1','R1'],['L2','L2'],['R2','R2']];
+  const physicalButtons=[['96','A / Cruz'],['97','B / Círculo'],['99','X / Quadrado'],['100','Y / Triângulo'],['108','Start'],['109','Select'],['102','L1'],['103','R1'],['104','L2'],['105','R2'],['19','D-pad cima'],['20','D-pad baixo'],['21','D-pad esquerda'],['22','D-pad direita'],['0','Desativado']];
+  const mapValues={};
   let chosenFile=null, loading=false, activeGameUrl=null, loaderScript=null;
   document.getElementById('slotLabel').textContent='DUAL '+slot;
   window.setControllerStatus=function(name){document.getElementById('controllerStatus').textContent='Controle físico: '+name;};
@@ -64,9 +76,15 @@ button:active{filter:brightness(1.25)}
     chosenFile=romInput.files&&romInput.files[0]||null;
     hint.textContent=chosenFile?'Selecionado: '+chosenFile.name:'Nenhum arquivo selecionado.';
   });
-  document.getElementById('bindController').addEventListener('click',()=>{
-    if(window.CyberBridge)window.CyberBridge.bindController();
-  });
+  function defaultPhysical(id){return ({UP:'19',DOWN:'20',LEFT:'21',RIGHT:'22',A:'96',B:'97',X:'99',Y:'100',START:'108',SELECT:'109',L1:'102',R1:'103',L2:'104',R2:'105'})[id]||'0';}
+  function renderMap(){const rows=document.getElementById('mapRows');rows.innerHTML='';actionNames.forEach(([id,label])=>{const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #38303f;font-size:13px';const title=document.createElement('span');title.textContent=label;const sel=document.createElement('select');sel.dataset.action=id;sel.style.cssText='width:58%;font-size:12px';physicalButtons.forEach(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;sel.appendChild(o)});sel.value=mapValues[id]||defaultPhysical(id);row.append(title,sel);rows.appendChild(row);});}
+  document.getElementById('bindController').addEventListener('click',()=>{mappingPanel.hidden=false;renderMap();if(window.CyberBridge)window.CyberBridge.bindController();});
+  document.getElementById('closeMap').addEventListener('click',()=>mappingPanel.hidden=true);
+  document.getElementById('autoMap').addEventListener('click',()=>{actionNames.forEach(([id])=>mapValues[id]=defaultPhysical(id));renderMap();hint.textContent='Mapeamento padrão aplicado. Clica em Salvar.';});
+  document.getElementById('saveMap').addEventListener('click',()=>{document.querySelectorAll('#mapRows select').forEach(s=>mapValues[s.dataset.action]=s.value);if(window.CyberBridge)window.CyberBridge.savePhysicalMapping(JSON.stringify(mapValues));mappingPanel.hidden=true;hint.textContent='Mapeamento físico salvo para este lado.';});
+  document.getElementById('fullscreen').addEventListener('click',()=>{if(window.CyberBridge)window.CyberBridge.toggleFullscreen();});
+  window.toggleFocusMode=function(enabled){document.body.classList.toggle('focus-mode',!!enabled);};
+  window.loadPhysicalMapping=function(json){try{Object.assign(mapValues,JSON.parse(json||'{}'));}catch(e){}};
   function supportedExtensions(core){
     if(core==='snes')return ['.sfc','.smc','.fig','.swc','.bin'];
     if(core==='segaMD')return ['.md','.gen','.smd','.bin'];
@@ -123,7 +141,7 @@ button:active{filter:brightness(1.25)}
       window.EJS_gameID='cyber90s-slot-'+slot;
       window.EJS_volume=0.35;
       window.EJS_disableAutoLang=true;
-      window.EJS_VirtualGamepadSettings={enabled:false};
+      window.EJS_VirtualGamepadSettings={enabled:false,opacity:0,hide:true};
       window.EJS_Buttons={playPause:false, restart:false, mute:false, settings:false, fullscreen:false, saveState:false, loadState:false, screenRecord:false, gamepad:false};
       window.EJS_onGameStart=()=>{hint.textContent='Jogo iniciado: '+prepared.name;loading=false;loadButton.disabled=false;chooseButton.disabled=false;};
       window.EJS_onLoadError=(error)=>{hint.textContent='Erro ao carregar o jogo: '+String(error||'ROM ou core incompatível');loading=false;loadButton.disabled=false;chooseButton.disabled=false;};
