@@ -8,8 +8,8 @@ android {
         applicationId = "com.cyber90s.dual"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "Beta 3"
+        versionCode = 4
+        versionName = "Beta 4"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
