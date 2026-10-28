@@ -39,6 +39,8 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileChooserCallback;
     private int mappingSlot = -1;
     private boolean focusMode = false;
+    private String capturingAction = null;
+    private int capturingSlot = -1;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -243,13 +245,21 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         InputDevice device = event.getDevice();
-        if (!isGamepad(device)) return super.dispatchKeyEvent(event);
-        if (event.getAction() != KeyEvent.ACTION_DOWN && event.getAction() != KeyEvent.ACTION_UP) return true;
-
-        if (mappingSlot >= 0 && event.getAction() == KeyEvent.ACTION_DOWN) {
-            assignController(mappingSlot, device);
+        if (capturingAction != null && event.getAction() == KeyEvent.ACTION_DOWN && device != null && isGamepad(device)) {
+            int targetSlot = capturingSlot;
+            String action = capturingAction;
+            getPreferences(MODE_PRIVATE).edit().putInt("map_slot_" + (targetSlot+1) + "_" + action, event.getKeyCode()).apply();
+            capturingAction = null;
+            capturingSlot = -1;
+            if (targetSlot >= 0 && targetSlot < 2 && players[targetSlot] != null) {
+                String js = "if(window.onPhysicalButtonCaptured)window.onPhysicalButtonCaptured(" + JSONObject.quote(action) + "," + event.getKeyCode() + ");";
+                players[targetSlot].post(() -> players[targetSlot].evaluateJavascript(js, null));
+            }
+            Toast.makeText(this, action + " mapeado para o botão " + event.getKeyCode(), Toast.LENGTH_SHORT).show();
             return true;
         }
+        if (!isGamepad(device)) return super.dispatchKeyEvent(event);
+        if (event.getAction() != KeyEvent.ACTION_DOWN && event.getAction() != KeyEvent.ACTION_UP) return true;
         int slot = slotForDescriptor(device.getDescriptor());
         if (slot < 0) return true;
         String key = mappedKey(event.getKeyCode(), slot);
@@ -314,6 +324,15 @@ public class MainActivity extends Activity {
         Bridge(int slot) { this.slot = slot; }
 
         @JavascriptInterface
+        public void beginButtonCapture(String action) {
+            runOnUiThread(() -> {
+                capturingAction = action;
+                capturingSlot = slot;
+                Toast.makeText(MainActivity.this, "Aperta agora o botão físico que quer usar para " + action + ".", Toast.LENGTH_LONG).show();
+            });
+        }
+
+        @JavascriptInterface
         public String getControllers() {
             return connectedControllersJson().toString();
         }
@@ -340,9 +359,9 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void bindController() {
             runOnUiThread(() -> {
-                mappingSlot = slot;
+                mappingSlot = -1;
                 Toast.makeText(MainActivity.this,
-                        "Se preferir, seleciona o controle na lista e toca em Vincular.",
+                        "Seleciona o controle conectado na lista e toca em Vincular.",
                         Toast.LENGTH_LONG).show();
             });
         }
