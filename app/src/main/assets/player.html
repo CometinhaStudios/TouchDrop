@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Cyber90s Dual</title>
+<style>
+:root{color-scheme:dark;--bg:#101014;--panel:#1b1b23;--accent:#9b5cff;--text:#f6f3ff;--muted:#b9b3c8}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:Arial,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;padding:8px;gap:7px}
+header{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.brand{font-size:14px;font-weight:800;letter-spacing:.5px}.slot{color:#c7a6ff}
+.status{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50%}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+select,button{min-width:0;border:1px solid #494052;border-radius:7px;background:var(--panel);color:var(--text);font-size:11px;padding:8px 5px}
+button.primary{background:var(--accent);border-color:var(--accent);font-weight:bold}
+button:active{filter:brightness(1.25)}
+#game{flex:1;min-height:0;background:#000;border:2px solid #37313f;border-radius:9px;overflow:hidden;position:relative}
+#game canvas{max-width:100%!important;max-height:100%!important;object-fit:contain}
+#hint{font-size:10px;color:var(--muted);line-height:1.3}
+#game .emulatorjs{max-width:100%;max-height:100%}
+</style>
+</head>
+<body>
+<header><div class="brand">CYBER90S <span class="slot" id="slotLabel">DUAL 1</span></div><div id="controllerStatus" class="status">Controle: não vinculado</div></header>
+<div class="controls">
+  <select id="system">
+    <option value="snes">Super Nintendo</option>
+    <option value="segaMD">Mega Drive</option>
+    <option value="nes">Nintendo / NES</option>
+    <option value="gba">Game Boy Advance</option>
+  </select>
+  <button id="chooseRom">Escolher ROM</button>
+  <button class="primary" id="loadGame">Carregar jogo</button>
+  <button id="bindController">Mapear controle</button>
+</div>
+<input id="rom" type="file" accept=".sfc,.smc,.md,.gen,.bin,.nes,.gba,.zip,.7z" hidden>
+<div id="game"><div style="height:100%;display:grid;place-items:center;color:#9b91aa;font-size:12px;text-align:center;padding:12px">Escolhe um console e uma ROM<br>para iniciar o jogo neste lado.</div></div>
+<div id="hint">Cada lado usa seu próprio controle. É necessário internet para carregar o motor EmulatorJS.</div>
+<script>
+(function(){
+  const params=new URLSearchParams(location.search);
+  const slot=Number(params.get('slot')||1);
+  document.getElementById('slotLabel').textContent='DUAL '+slot;
+  const system=document.getElementById('system');
+  const romInput=document.getElementById('rom');
+  const game=document.getElementById('game');
+  let chosenFile=null, loading=false;
+  window.setControllerStatus=function(name){
+    document.getElementById('controllerStatus').textContent='Controle: '+name;
+  };
+  window.cyberInput=function(key,down){
+    const type=down?'keydown':'keyup';
+    const event=new KeyboardEvent(type,{key:key,code:key==='enter'?'Enter':key==='tab'?'Tab':key,bubbles:true,cancelable:true});
+    document.dispatchEvent(event);
+  };
+  document.getElementById('chooseRom').addEventListener('click',()=>romInput.click());
+  romInput.addEventListener('change',()=>{chosenFile=romInput.files&&romInput.files[0]||null;document.getElementById('hint').textContent=chosenFile?'ROM selecionada: '+chosenFile.name:'Nenhuma ROM selecionada';});
+  document.getElementById('bindController').addEventListener('click',()=>{
+    if(window.CyberBridge)window.CyberBridge.bindController();
+  });
+  document.getElementById('loadGame').addEventListener('click',()=>{
+    if(loading)return;
+    if(!chosenFile){document.getElementById('hint').textContent='Escolhe uma ROM primeiro.';return;}
+    loading=true;
+    game.innerHTML='<div style="height:100%;display:grid;place-items:center;color:#d7c6ff;font-size:12px">Carregando motor e jogo…</div>';
+    const gameUrl=URL.createObjectURL(chosenFile);
+    window.EJS_player='#game';
+    window.EJS_core=system.value;
+    window.EJS_gameUrl=gameUrl;
+    window.EJS_gameName=chosenFile.name;
+    window.EJS_pathtodata='https://cdn.emulatorjs.org/stable/data/';
+    window.EJS_language='pt-BR';
+    window.EJS_startOnLoaded=true;
+    window.EJS_gameID=slot;
+    window.EJS_volume=0.45;
+    window.EJS_disableAutoLang=true;
+    window.EJS_defaultControls=slot===1?{
+      0:{
+        0:{value:'x',value2:'BUTTON_2'},1:{value:'s',value2:'BUTTON_4'},
+        2:{value:'v',value2:'SELECT'},3:{value:'enter',value2:'START'},
+        4:{value:'up arrow',value2:'DPAD_UP'},5:{value:'down arrow',value2:'DPAD_DOWN'},
+        6:{value:'left arrow',value2:'DPAD_LEFT'},7:{value:'right arrow',value2:'DPAD_RIGHT'},
+        8:{value:'z',value2:'BUTTON_1'},9:{value:'a',value2:'BUTTON_3'},
+        10:{value:'q',value2:'LEFT_TOP_SHOULDER'},11:{value:'e',value2:'RIGHT_TOP_SHOULDER'},
+        12:{value:'tab',value2:'LEFT_BOTTOM_SHOULDER'},13:{value:'r',value2:'RIGHT_BOTTOM_SHOULDER'}
+      },1:{},2:{},3:{}
+    }:{
+      0:{
+        0:{value:'k',value2:'BUTTON_2'},1:{value:'i',value2:'BUTTON_4'},
+        2:{value:'h',value2:'SELECT'},3:{value:'enter',value2:'START'},
+        4:{value:'w',value2:'DPAD_UP'},5:{value:'s',value2:'DPAD_DOWN'},
+        6:{value:'a',value2:'DPAD_LEFT'},7:{value:'d',value2:'DPAD_RIGHT'},
+        8:{value:'j',value2:'BUTTON_1'},9:{value:'u',value2:'BUTTON_3'},
+        10:{value:'o',value2:'LEFT_TOP_SHOULDER'},11:{value:'p',value2:'RIGHT_TOP_SHOULDER'},
+        12:{value:'y',value2:'LEFT_BOTTOM_SHOULDER'},13:{value:'t',value2:'RIGHT_BOTTOM_SHOULDER'}
+      },1:{},2:{},3:{}
+    };
+    const script=document.createElement('script');
+    script.src='https://cdn.emulatorjs.org/stable/data/loader.js';
+    script.onload=()=>{document.getElementById('hint').textContent='Jogo iniciado. Se não aparecer, confira a ROM e a conexão.';};
+    script.onerror=()=>{loading=false;document.getElementById('hint').textContent='Falha ao baixar EmulatorJS. Confere a internet e tenta novamente.';};
+    document.body.appendChild(script);
+  });
+})();
+</script>
+</body>
+</html>
