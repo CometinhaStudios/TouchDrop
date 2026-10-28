@@ -135,6 +135,39 @@ public class MainActivity extends Activity {
         return -1;
     }
 
+    private org.json.JSONArray connectedControllersJson() {
+        org.json.JSONArray result = new org.json.JSONArray();
+        for (int id : InputDevice.getDeviceIds()) {
+            InputDevice d = InputDevice.getDevice(id);
+            if (d == null || !isGamepad(d) || d.isVirtual()) continue;
+            try {
+                JSONObject item = new JSONObject();
+                item.put("id", d.getId());
+                item.put("name", d.getName());
+                item.put("descriptor", d.getDescriptor());
+                int assigned = slotForDescriptor(d.getDescriptor());
+                item.put("assigned", assigned < 0 ? 0 : assigned + 1);
+                item.put("sources", d.getSources());
+                result.put(item);
+            } catch (Exception ignored) {}
+        }
+        return result;
+    }
+
+    private void disconnectController(int slot) {
+        String old = controllerDescriptors[slot];
+        controllerDescriptors[slot] = "";
+        getPreferences(MODE_PRIVATE).edit().putString("controller_slot_" + (slot+1), "").apply();
+        if (old != null && !old.isEmpty()) {
+            for (int id : InputDevice.getDeviceIds()) {
+                InputDevice d = InputDevice.getDevice(id);
+                if (d != null && old.equals(d.getDescriptor())) axisKeysByDevice.remove(id);
+            }
+        }
+        updateControllerLabel(slot, "não vinculado");
+        Toast.makeText(this, "Controle desvinculado do jogador " + (slot+1), Toast.LENGTH_SHORT).show();
+    }
+
     private void assignController(int slot, InputDevice device) {
         if (device == null || !isGamepad(device)) {
             Toast.makeText(this, "Esse dispositivo não parece ser um controle. Aperta um botão no controle Bluetooth/USB.", Toast.LENGTH_LONG).show();
@@ -281,11 +314,35 @@ public class MainActivity extends Activity {
         Bridge(int slot) { this.slot = slot; }
 
         @JavascriptInterface
+        public String getControllers() {
+            return connectedControllersJson().toString();
+        }
+
+        @JavascriptInterface
+        public void assignController(String descriptor) {
+            runOnUiThread(() -> {
+                for (int id : InputDevice.getDeviceIds()) {
+                    InputDevice device = InputDevice.getDevice(id);
+                    if (device != null && descriptor != null && descriptor.equals(device.getDescriptor())) {
+                        assignController(slot, device);
+                        return;
+                    }
+                }
+                Toast.makeText(MainActivity.this, "Controle não encontrado. Toca em Atualizar lista.", Toast.LENGTH_LONG).show();
+            });
+        }
+
+        @JavascriptInterface
+        public void disconnectController() {
+            runOnUiThread(() -> disconnectController(slot));
+        }
+
+        @JavascriptInterface
         public void bindController() {
             runOnUiThread(() -> {
                 mappingSlot = slot;
                 Toast.makeText(MainActivity.this,
-                        "Emulador " + (slot + 1) + ": aperta um botão no controle que quer vincular.",
+                        "Se preferir, seleciona o controle na lista e toca em Vincular.",
                         Toast.LENGTH_LONG).show();
             });
         }
