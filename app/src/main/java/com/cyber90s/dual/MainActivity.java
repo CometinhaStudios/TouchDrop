@@ -200,7 +200,8 @@ public class MainActivity extends Activity {
 
     private void sendKeyToSlot(int slot, String key, boolean down) {
         if (slot < 0 || slot > 1 || players[slot] == null || key == null) return;
-        String js = "if(window.cyberInput)window.cyberInput(" + JSONObject.quote(key) + "," + down + ");";
+        String js = "if(window.cyberInput)window.cyberInput(" + JSONObject.quote(key) + "," + down + ");"
+                + (down ? "if(window.setControllerStatus)window.setControllerStatus('Sinal recebido • " + (slot + 1) + "');" : "");
         players[slot].post(() -> players[slot].evaluateJavascript(js, null));
     }
 
