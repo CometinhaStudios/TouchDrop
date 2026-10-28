@@ -18,7 +18,7 @@ button.primary{background:var(--accent);border-color:var(--accent);font-weight:b
 button:active{filter:brightness(1.25)}
 #game{flex:1;min-height:0;background:#000;border:3px solid #28242e;border-radius:13px;overflow:hidden;position:relative;box-shadow:inset 0 0 18px #000,0 0 8px #000}
 #game:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0px,rgba(0,0,0,0) 2px,rgba(0,0,0,.25) 3px),linear-gradient(90deg,rgba(80,120,255,.035),rgba(255,60,60,.035));box-shadow:inset 0 0 25px rgba(0,0,0,.65)}
-.ejs_virtualGamepad,.ejs_gamepad,.gamepad,.gamepad-container,[class*=virtualGamepad],[id*=virtualGamepad],[class*=gamepad-overlay]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+.ejs_virtualGamepad,.ejs_gamepad,.gamepad,.gamepad-container,.ejs_gamepad_container,.virtual-gamepad,#virtual-gamepad,#gamepad,[class*=virtualGamepad],[id*=virtualGamepad],[class*=gamepad-overlay],#game [class*=gamepad],body>div[class*=gamepad]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 body.focus-mode{padding:0;gap:0;background:#000}body.focus-mode header,body.focus-mode .controls,body.focus-mode #hint{display:none!important}body.focus-mode #game{border:0;border-radius:0;box-shadow:none}
 #game canvas{max-width:100%!important;max-height:100%!important;object-fit:contain}
 #hint{font-size:9px;color:var(--muted);line-height:1.25;min-height:12px;max-height:28px;overflow:hidden}
