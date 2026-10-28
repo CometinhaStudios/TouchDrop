@@ -38,6 +38,7 @@ public class MainActivity extends Activity {
     private WebViewAssetLoader assetLoader;
     private ValueCallback<Uri[]> fileChooserCallback;
     private int mappingSlot = -1;
+    private boolean focusMode = false;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -168,29 +169,44 @@ public class MainActivity extends Activity {
         players[slot].post(() -> players[slot].evaluateJavascript(js, null));
     }
 
+    private String actionForKeyCode(int keyCode, int slot) {
+        String[] actions = {"UP","DOWN","LEFT","RIGHT","A","B","X","Y","START","SELECT","L1","R1","L2","R2"};
+        String[] prefKeys = new String[actions.length];
+        for (int i=0;i<actions.length;i++) prefKeys[i] = "map_slot_" + (slot+1) + "_" + actions[i];
+        android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        int[] defaults = {KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_BUTTON_A,KeyEvent.KEYCODE_BUTTON_B,KeyEvent.KEYCODE_BUTTON_X,KeyEvent.KEYCODE_BUTTON_Y,
+                KeyEvent.KEYCODE_BUTTON_START,KeyEvent.KEYCODE_BUTTON_SELECT,KeyEvent.KEYCODE_BUTTON_L1,KeyEvent.KEYCODE_BUTTON_R1,
+                KeyEvent.KEYCODE_BUTTON_L2,KeyEvent.KEYCODE_BUTTON_R2};
+        for (int i=0;i<actions.length;i++) {
+            int configured = prefs.getInt(prefKeys[i], defaults[i]);
+            if (configured != 0 && configured == keyCode) return actions[i];
+        }
+        return null;
+    }
+
     private String mappedKey(int keyCode, int slot) {
+        String action = actionForKeyCode(keyCode, slot);
+        if (action == null) return null;
         boolean first = slot == 0;
-        switch (keyCode) {
-            case KeyEvent.KEYCODE_DPAD_UP: return first ? "ArrowUp" : "w";
-            case KeyEvent.KEYCODE_DPAD_DOWN: return first ? "ArrowDown" : "s";
-            case KeyEvent.KEYCODE_DPAD_LEFT: return first ? "ArrowLeft" : "a";
-            case KeyEvent.KEYCODE_DPAD_RIGHT: return first ? "ArrowRight" : "d";
-            case KeyEvent.KEYCODE_BUTTON_A: return first ? "z" : "j";
-            case KeyEvent.KEYCODE_BUTTON_B: return first ? "x" : "k";
-            case KeyEvent.KEYCODE_BUTTON_X: return first ? "a" : "u";
-            case KeyEvent.KEYCODE_BUTTON_Y: return first ? "s" : "i";
-            case KeyEvent.KEYCODE_BUTTON_START: return "enter";
-            case KeyEvent.KEYCODE_BUTTON_SELECT: return first ? "v" : "h";
-            case KeyEvent.KEYCODE_BUTTON_L1: return first ? "q" : "o";
-            case KeyEvent.KEYCODE_BUTTON_R1: return first ? "e" : "p";
-            case KeyEvent.KEYCODE_BUTTON_L2: return first ? "tab" : "y";
-            case KeyEvent.KEYCODE_BUTTON_R2: return first ? "r" : "t";
-            case KeyEvent.KEYCODE_BUTTON_THUMBL: return first ? "1" : "3";
-            case KeyEvent.KEYCODE_BUTTON_THUMBR: return first ? "2" : "4";
+        switch (action) {
+            case "UP": return first ? "ArrowUp" : "w";
+            case "DOWN": return first ? "ArrowDown" : "s";
+            case "LEFT": return first ? "ArrowLeft" : "a";
+            case "RIGHT": return first ? "ArrowRight" : "d";
+            case "A": return first ? "z" : "j";
+            case "B": return first ? "x" : "k";
+            case "X": return first ? "a" : "u";
+            case "Y": return first ? "s" : "i";
+            case "START": return "enter";
+            case "SELECT": return first ? "v" : "h";
+            case "L1": return first ? "q" : "o";
+            case "R1": return first ? "e" : "p";
+            case "L2": return first ? "tab" : "y";
+            case "R2": return first ? "r" : "t";
             default: return null;
         }
     }
-
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         InputDevice device = event.getDevice();
@@ -260,6 +276,33 @@ public class MainActivity extends Activity {
                 Toast.makeText(MainActivity.this,
                         "Emulador " + (slot + 1) + ": aperta um botão no controle que quer vincular.",
                         Toast.LENGTH_LONG).show();
+            });
+        }
+
+        @JavascriptInterface
+        public void savePhysicalMapping(String json) {
+            runOnUiThread(() -> {
+                try {
+                    JSONObject values = new JSONObject(json);
+                    String[] actions = {"UP","DOWN","LEFT","RIGHT","A","B","X","Y","START","SELECT","L1","R1","L2","R2"};
+                    android.content.SharedPreferences.Editor editor = getPreferences(MODE_PRIVATE).edit();
+                    for (String action : actions) {
+                        if (values.has(action)) editor.putInt("map_slot_" + (slot+1) + "_" + action, Integer.parseInt(values.getString(action)));
+                    }
+                    editor.apply();
+                    Toast.makeText(MainActivity.this, "Mapeamento salvo no lado " + (slot+1), Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "Não consegui salvar o mapeamento.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void toggleFullscreen() {
+            runOnUiThread(() -> {
+                focusMode = !focusMode;
+                String js = "if(window.toggleFocusMode)window.toggleFocusMode(" + focusMode + ");";
+                for (WebView player : players) if (player != null) player.evaluateJavascript(js, null);
             });
         }
 
