@@ -253,6 +253,17 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onBackPressed() {
+        if (focusMode) {
+            focusMode = false;
+            String js = "if(window.toggleFocusMode)window.toggleFocusMode(false);";
+            for (WebView player : players) if (player != null) player.evaluateJavascript(js, null);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == PICK_ROM && fileChooserCallback != null) {
