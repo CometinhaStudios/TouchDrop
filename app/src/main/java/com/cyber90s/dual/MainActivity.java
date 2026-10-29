@@ -229,9 +229,13 @@ public class MainActivity extends Activity {
                 int action = down ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
                 KeyEvent nativeEvent = new KeyEvent(now, now, action, keyCode, 0);
                 web.dispatchKeyEvent(nativeEvent);
-                if (down) {
-                    web.evaluateJavascript("if(window.setControllerStatus)window.setControllerStatus('Comando enviado • " + (slot + 1) + "');", null);
-                }
+                // Also forward the mapped key into the JavaScript input bridge.
+                // EmulatorJS runs inside the WebView and listens for DOM keyboard events;
+                // dispatchKeyEvent alone does not guarantee those DOM events are generated.
+                String js = "if(window.cyberInput)window.cyberInput("
+                        + JSONObject.quote(key) + "," + down + ");"
+                        + (down ? "if(window.setControllerStatus)window.setControllerStatus('Entrada recebida • " + (slot + 1) + "');" : "");
+                web.evaluateJavascript(js, null);
             });
         }
     }
